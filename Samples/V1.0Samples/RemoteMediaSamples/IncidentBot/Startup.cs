@@ -102,10 +102,10 @@ namespace Sample.IncidentBot
             EnvironmentSettings envs = new EnvironmentSettings();
             config.Bind("AzureSettings", envs);
             var placeCallUrl = config.GetSection("Bot").GetValue<string>("PlaceCallEndpointUrl");
-            var botBaseUrl = config["urlProtocol"] + "://" + envs?.ServiceDnsName;
+
             options.AppSecret = config["AzureSettings:AppSecret"];
             options.AppId = config["AzureSettings:AppId"];
-            options.BotBaseUrl = botBaseUrl != null ? new System.Uri(botBaseUrl) : options.BotBaseUrl;
+            options.BotBaseUrl = new Uri(config["BaseUrl"]);
             options.PlaceCallEndpointUrl = placeCallUrl != null ? new Uri(placeCallUrl) : new Uri("https://graph.microsoft.com/v1.0");
         }
     }
