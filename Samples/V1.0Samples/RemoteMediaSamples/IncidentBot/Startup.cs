@@ -57,6 +57,7 @@ namespace Sample.IncidentBot
                 })
                 .AddAzureAdBearer(options => this.Configuration.Bind("AzureAd", options));
 
+
             services
                 .AddBot(options => this.ResolveBotOptions(options))
                 .AddMvc();
@@ -103,8 +104,8 @@ namespace Sample.IncidentBot
             config.Bind("AzureSettings", envs);
             var placeCallUrl = config.GetSection("Bot").GetValue<string>("PlaceCallEndpointUrl");
             var botBaseUrl = config["urlProtocol"] + "://" + envs?.ServiceDnsName;
-            options.AppSecret = envs?.AadAppSecret ?? options.AppSecret;
-            options.AppId = envs?.AadAppId ?? options.AppId;
+            options.AppSecret = config["AzureSettings:AppSecret"];
+            options.AppId = config["AzureSettings:AppId"];
             options.BotBaseUrl = botBaseUrl != null ? new System.Uri(botBaseUrl) : options.BotBaseUrl;
             options.PlaceCallEndpointUrl = placeCallUrl != null ? new Uri(placeCallUrl) : new Uri("https://graph.microsoft.com/v1.0");
         }
