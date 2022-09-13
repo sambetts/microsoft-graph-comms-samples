@@ -57,7 +57,6 @@ namespace Sample.IncidentBot
                 })
                 .AddAzureAdBearer(options => this.Configuration.Bind("AzureAd", options));
 
-
             services
                 .AddBot(options => this.ResolveBotOptions(options))
                 .AddMvc();

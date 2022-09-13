@@ -5,6 +5,8 @@
 
 namespace Sample.IncidentBot
 {
+    using System;
+    using System.IO;
     using Microsoft.AspNetCore;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Configuration;
@@ -37,8 +39,11 @@ namespace Sample.IncidentBot
         /// </summary>
         /// <param name="args">The arguments.</param>
         /// <returns>The web host.</returns>
-        public static IWebHost BuildWebHost(string[] args) =>
-            WebHost.CreateDefaultBuilder(args)
+        public static IWebHost BuildWebHost(string[] args)
+        {
+            var baseDir = $"{AppDomain.CurrentDomain.BaseDirectory}\\wwwroot\\";
+
+            return WebHost.CreateDefaultBuilder(args)
                 .ConfigureLogging((hostingContext, logging) =>
                 {
                     logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
@@ -48,7 +53,9 @@ namespace Sample.IncidentBot
                 })
                 .UseStartup<Startup>()
                 .UseUrls(baseUrl)
+                .UseWebRoot(baseDir)
                 .Build();
+        }
 
         /// <summary>
         /// Start method.
