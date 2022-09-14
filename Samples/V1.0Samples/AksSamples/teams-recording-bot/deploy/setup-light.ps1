@@ -51,6 +51,7 @@ az aks get-credentials --resource-group $resourceGroupName --name $AKSClusterNam
 kubectl create namespace bot-aks-simple
 
 # Config
+kubectl delete secret bot-application-secrets -n bot-aks-simple
 kubectl create secret generic bot-application-secrets --namespace bot-aks-simple `
     --from-literal=applicationId="$applicationId" `
     --from-literal=applicationSecret="$applicationSecret" `
