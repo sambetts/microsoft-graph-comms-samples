@@ -94,8 +94,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: bot-service
-  annotations:
-    service.beta.kubernetes.io/azure-dns-label-name: sfb-test-aksbot
 spec:
   # LoadBalancer type to allow external access to multiple ports
   type: LoadBalancer
@@ -103,15 +101,15 @@ spec:
     # Will deliver external traffic to the pod holding each of our containers
     app: bot
   ports:
-    - name: https
+    - name: mediastream
       protocol: TCP
       port: 443
       targetPort: 9441
-    - name: whatevs
+    - name: mediastream
       protocol: TCP
       port: 8445
       targetPort: 8445
-    - name: asdfasdfasdf
+    - name: mediastreamplusone
       protocol: TCP
       port: 9442
       targetPort: 9442
