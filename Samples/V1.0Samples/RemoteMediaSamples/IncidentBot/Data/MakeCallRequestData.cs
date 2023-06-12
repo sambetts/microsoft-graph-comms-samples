@@ -14,13 +14,11 @@ namespace Sample.IncidentBot.Data
         /// Initializes a new instance of the <see cref="MakeCallRequestData"/> class.
         /// </summary>
         /// <param name="tenantId">The tenant id.</param>
-        /// <param name="objectId">The user object id.</param>
-        /// <param name="isApplication">Whether the object is application.</param>
-        public MakeCallRequestData(string tenantId, string objectId, bool isApplication)
+        /// <param name="phoneNumber">a.</param>
+        public MakeCallRequestData(string tenantId, string phoneNumber)
         {
             this.TenantId = tenantId;
-            this.ObjectId = objectId;
-            this.IsApplication = isApplication;
+            this.PhoneNumber = phoneNumber;
         }
 
         /// <summary>
@@ -38,11 +36,6 @@ namespace Sample.IncidentBot.Data
         /// <summary>
         /// Gets or sets the object id.
         /// </summary>
-        public string ObjectId { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the object is application.
-        /// </summary>
-        public bool IsApplication { get; set; }
+        public string PhoneNumber { get; set; }
     }
 }

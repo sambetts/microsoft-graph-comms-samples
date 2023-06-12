@@ -216,13 +216,12 @@ namespace Sample.IncidentBot.Bot
             // Rehydrates and validates the group call.
             botMeetingCall = await this.RehydrateAndValidateGroupCallAsync(this.Client, botMeetingCall).ConfigureAwait(false);
 
-            foreach (var objectId in incidentRequestData.ObjectIds)
+            foreach (var pn in incidentRequestData.PhoneNumbers)
             {
                 var makeCallRequestData =
                     new MakeCallRequestData(
                         incidentRequestData.TenantId,
-                        objectId,
-                        "Application".Equals(incidentRequestData.ResponderType, StringComparison.OrdinalIgnoreCase));
+                        pn);
                 var responderCall = await this.MakeCallAsync(makeCallRequestData, scenarioId).ConfigureAwait(false);
                 this.AddCallToHandlers(responderCall, new IncidentCallContext(IncidentCallType.ResponderNotification, incidentId));
             }
@@ -299,32 +298,19 @@ namespace Sample.IncidentBot.Bot
                 throw new ArgumentNullException(nameof(makeCallBody.TenantId));
             }
 
-            if (makeCallBody.ObjectId == null)
+            if (makeCallBody.PhoneNumber == null)
             {
-                throw new ArgumentNullException(nameof(makeCallBody.ObjectId));
+                throw new ArgumentNullException(nameof(makeCallBody.PhoneNumber));
             }
 
             var target =
-                makeCallBody.IsApplication ?
-                new InvitationParticipantInfo
-                {
-                    Identity = new IdentitySet
-                    {
-                        Application = new Identity
-                        {
-                            Id = makeCallBody.ObjectId,
-                            DisplayName = $"Responder {makeCallBody.ObjectId}",
-                        },
-                    },
-                }
-                :
                 new InvitationParticipantInfo
                 {
                     Identity = new IdentitySet
                     {
                         User = new Identity
                         {
-                            Id = makeCallBody.ObjectId,
+                            Id = makeCallBody.PhoneNumber,
                         },
                     },
                 };

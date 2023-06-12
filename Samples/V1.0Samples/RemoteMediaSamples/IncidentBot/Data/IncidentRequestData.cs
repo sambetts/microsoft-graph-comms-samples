@@ -26,7 +26,7 @@ namespace Sample.IncidentBot.Data
         /// <summary>
         /// Gets or sets the user object ids.
         /// </summary>
-        public IEnumerable<string> ObjectIds { get; set; }
+        public IEnumerable<string> PhoneNumbers { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the responders are applications or users.

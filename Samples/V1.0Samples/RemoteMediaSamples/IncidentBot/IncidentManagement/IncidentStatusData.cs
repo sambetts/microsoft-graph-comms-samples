@@ -46,7 +46,7 @@ namespace Sample.IncidentBot.IncidentStatus
         /// <param name="id">The incident id.</param>
         /// <param name="data">The incident data.</param>
         public IncidentStatusData(string id, IncidentRequestData data)
-            : this(id, data.Name, data.Time, data.ObjectIds)
+            : this(id, data.Name, data.Time, data.PhoneNumbers)
         {
         }
 

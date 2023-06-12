@@ -1,0 +1,14 @@
+authtoken: 1rkIDkM67hqu7ZfGihXC7wtGQag_qLU8XWTo18MDrXDUu7ZL
+version: "2"
+
+region: us
+tunnels:
+    RickrollBot:
+        addr: https://localhost:9441
+        proto: http
+        subdomain: teamsmeetingbot
+        host_header: localhost
+    media:
+        addr: 8445
+        proto: tcp
+        remote_addr: 3.tcp.ngrok.io:28416
