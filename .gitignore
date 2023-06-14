@@ -269,3 +269,4 @@ _site/
 appsettings.development.json
 *.development.pubxml
 *.original
+/Samples/V1.0Samples/RemoteMediaSamples/WebApplication1
