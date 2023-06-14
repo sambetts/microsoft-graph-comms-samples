@@ -1,27 +1,28 @@
-﻿
+﻿using Microsoft.AspNetCore.Mvc;
+using Sample.IncidentBot.Bot;
+
 
 namespace Sample.IncidentBot.Http;
-
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
 /// Entry point for handling call-related web hook requests from the stateful client.
 /// </summary>
 public class PlatformCallController : ControllerBase
 {
+    private readonly CallingBot _callingBot;
+
+    public PlatformCallController(CallingBot callingBot)
+    {
+        _callingBot = callingBot;
+    }
 
     /// <summary>
     /// Handle a callback for an existing call.
     /// </summary>
     [HttpPost]
     [Route(HttpRouteConstants.OnIncomingRequestRoute)]
-    public IActionResult OnIncomingRequestAsync()
+    public async Task OnIncomingRequestAsync()
     {
-        // Convert the status code, content of HttpResponseMessage to IActionResult,
-        // and copy the headers from response to HttpContext.Response.Headers.
-        return Accepted();
+        await _callingBot.ProcessNotificationAsync(this.Request, this.Response).ConfigureAwait(false);
     }
 }

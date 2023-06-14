@@ -1,21 +1,27 @@
+using Microsoft.Graph.Communications.Common.Telemetry;
 using Sample.IncidentBot.Bot;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.Bind("");
 
 var logger = LoggerFactory.Create(config =>
 {
     config.AddConsole();
 }).CreateLogger("asdfasdfasdf");
+builder.Services.AddSingleton(logger);
 
 // Add services to the container.
 
+builder.Services.AddBot(options => builder.Configuration.Bind("Bot", options));
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSingleton(new CallingBot("https://sambetts.eu.ngrok.io", "d2a35726-10be-4092-8ea0-d70e7fd87cca", "w0X8Q~q1VyoaayLSMEKnVlBuTYh3HgvveAjetb14",
-    "a9c42b85-c133-4aaf-a935-5b4685768b16", "cf32af95-0174-485c-a495-3cd29fd0b981", logger));
+
+var graphLogger = new GraphLogger(typeof(Program).Assembly.GetName().Name);
+builder.Services.AddSingleton<IGraphLogger>(graphLogger);
 
 var app = builder.Build();
 

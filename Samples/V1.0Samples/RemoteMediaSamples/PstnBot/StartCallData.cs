@@ -1,23 +1,14 @@
-﻿// <copyright file="IncidentRequestData.cs" company="Microsoft Corporation">
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.
-// </copyright>
-
-namespace Sample.IncidentBot.Data
+﻿
+namespace Sample.IncidentBot.Data;
+/// <summary>
+/// The incident request data.
+/// </summary>
+public class StartCallData
 {
-    using System;
-    using System.Collections.Generic;
 
     /// <summary>
-    /// The incident request data.
+    /// Gets or sets the user object ids.
     /// </summary>
-    public class StartCallData
-    {
+    public string PhoneNumber { get; set; } = null!;
 
-        /// <summary>
-        /// Gets or sets the user object ids.
-        /// </summary>
-        public string PhoneNumber { get; set; } = null!;
-
-    }
 }

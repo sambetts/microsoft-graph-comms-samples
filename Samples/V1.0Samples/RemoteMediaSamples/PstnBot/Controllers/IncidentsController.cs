@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Graph;
 using PstnBot;
 using Sample.IncidentBot.Bot;
 using Sample.IncidentBot.Data;
