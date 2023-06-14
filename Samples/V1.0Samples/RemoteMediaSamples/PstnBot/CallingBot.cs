@@ -1,14 +1,8 @@
-﻿
-namespace Sample.IncidentBot.Bot;
-
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Text;
+using System.Text.Json;
 using PstnBot;
-using Sample.IncidentBot.Data;
 
+namespace Sample.IncidentBot.Bot;
 /// <summary>
 /// The core bot logic.
 /// </summary>
@@ -45,29 +39,31 @@ public class CallingBot
     /// message: "You are calling an incident application endpoint. It's a sample for incoming call with audio prompt.".
     /// </remarks>
     public const string BotEndpointIncomingPromptName = "BotEndpointIncomingPrompt";
-
-
-    private readonly LinkedList<string> callbackLogs = new LinkedList<string>();
+    private readonly string _clientId;
     private readonly string _tenantId;
-
+    private readonly string _botObjectId;
+    private readonly ILogger _logger;
+    private ConfidentialClientApplicationThrottledHttpClient _httpClient;
     /// <summary>
     /// Initializes a new instance of the <see cref="CallingBot" /> class.
     /// </summary>
     /// <param name="options">The bot options.</param>
     /// <param name="graphLogger">The graph logger.</param>
-    public CallingBot(string botBaseUrl, string tenantId)
+    public CallingBot(string botBaseUrl, string clientId, string secret, string tenantId, string botObjectId, ILogger logger)
     {
         this.BotInstanceUri = botBaseUrl;
+        _clientId = clientId;
         _tenantId = tenantId;
-        var instanceNotificationUri = botBaseUrl + HttpRouteConstants.OnIncomingRequestRoute;
+        _botObjectId = botObjectId;
+        _logger = logger;
 
-        var name = this.GetType().Assembly.GetName().Name;
+        _httpClient = new ConfidentialClientApplicationThrottledHttpClient(clientId, secret, tenantId, false, logger);
         
         this.MediaMap[TransferingPromptName] = new Microsoft.Graph.MediaPrompt
         {
             MediaInfo = new Microsoft.Graph.MediaInfo
             {
-                Uri = new Uri(botBaseUrl + "audio/responder-transfering.wav").ToString(),
+                Uri = new Uri(botBaseUrl + "/audio/responder-transfering.wav").ToString(),
                 ResourceId = Guid.NewGuid().ToString(),
             },
         };
@@ -76,7 +72,7 @@ public class CallingBot
         {
             MediaInfo = new Microsoft.Graph.MediaInfo
             {
-                Uri = new Uri(botBaseUrl + "audio/responder-notification.wav").ToString(),
+                Uri = new Uri(botBaseUrl + "/audio/responder-notification.wav").ToString(),
                 ResourceId = Guid.NewGuid().ToString(),
             },
         };
@@ -85,7 +81,7 @@ public class CallingBot
         {
             MediaInfo = new Microsoft.Graph.MediaInfo
             {
-                Uri = new Uri(botBaseUrl + "audio/bot-incoming.wav").ToString(),
+                Uri = new Uri(botBaseUrl + "/audio/bot-incoming.wav").ToString(),
                 ResourceId = Guid.NewGuid().ToString(),
             },
         };
@@ -94,7 +90,7 @@ public class CallingBot
         {
             MediaInfo = new Microsoft.Graph.MediaInfo
             {
-                Uri = new Uri(botBaseUrl + "audio/bot-endpoint-incoming.wav").ToString(),
+                Uri = new Uri(botBaseUrl + "/audio/bot-endpoint-incoming.wav").ToString(),
                 ResourceId = Guid.NewGuid().ToString(),
             },
         };
@@ -115,12 +111,12 @@ public class CallingBot
     /// </summary>
     /// <param name="incidentRequestData">The incident data.</param>
     /// <returns>The task for await.</returns>
-    public async Task<PstnBot.Call> StartP2PCall(string phoneNumber)
+    public async Task<Call> StartP2PCall(string phoneNumber)
     {
         var target =
             new ParticipantInfo
             {
-                Identity = new IdentitySet
+                Identity = new PhoneIdentitySet
                 {
                     Phone = new Identity
                     {
@@ -135,14 +131,34 @@ public class CallingBot
             mediaToPrefetch.Add(m.Value.MediaInfo);
         }
 
-        var call = new Call
+        var newCall = new Call
         {
             Targets = new List<ParticipantInfo> { target },
             MediaConfig = new MediaConfig { PreFetchMedia = mediaToPrefetch },
             RequestedModalities = new List<string> { "audio" },
             TenantId = _tenantId,
+            CallbackUri = BotInstanceUri + HttpRouteConstants.OnIncomingRequestRoute,
+            Source = new CallSource 
+            {
+                Identity = new AppInstanceIdentitySet
+                {
+                    ApplicationInstance = new Identity { DisplayName = "Calling bot", Id = _botObjectId },
+                },
+            }
         };
+        var opts = new JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+        var jsonPayload = JsonSerializer.Serialize(newCall, opts);   
 
-        return call;   
+        using (var response =
+        await _httpClient.PostAsync("https://graph.microsoft.com/beta/communications/calls", new StringContent(jsonPayload, Encoding.UTF8, "application/json")))
+        {
+            var result = await response.Content.ReadAsStringAsync();
+            response.EnsureSuccessStatusCode();
+
+            return JsonSerializer.Deserialize<Call>(result) ?? throw new ArgumentNullException(jsonPayload);
+        }
     }
 }

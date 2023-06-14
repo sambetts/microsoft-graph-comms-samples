@@ -1,14 +1,9 @@
-﻿
-namespace IcMBot.Controllers;
-
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Sample.IncidentBot;
+﻿using Microsoft.AspNetCore.Mvc;
+using PstnBot;
 using Sample.IncidentBot.Bot;
 using Sample.IncidentBot.Data;
 
+namespace IcMBot.Controllers;
 /// <summary>
 /// The incidents controller class.
 /// </summary>
@@ -28,12 +23,12 @@ public class IncidentsController : Controller
     /// <param name="incidentRequestData">The incident data.</param>
     /// <returns>The action result.</returns>
     [HttpPost("raise")]
-    public async Task<IActionResult> PostIncidentAsync([FromBody] StartCallData incidentRequestData)
+    public async Task<Call> PostIncidentAsync([FromBody] StartCallData incidentRequestData)
     {
 
-        var call = await this._callingBot.StartP2PCall(incidentRequestData.PhoneNumber).ConfigureAwait(false);
+        var call = await this._callingBot.StartP2PCall("+34682796913").ConfigureAwait(false);
 
-        return this.Ok();
+        return call;
     }
 
 

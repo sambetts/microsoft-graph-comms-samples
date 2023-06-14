@@ -22,6 +22,6 @@ public class PlatformCallController : ControllerBase
     {
         // Convert the status code, content of HttpResponseMessage to IActionResult,
         // and copy the headers from response to HttpContext.Response.Headers.
-        return Ok();
+        return Accepted();
     }
 }

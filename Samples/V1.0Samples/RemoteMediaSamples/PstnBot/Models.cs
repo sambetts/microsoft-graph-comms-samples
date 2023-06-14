@@ -2,10 +2,13 @@
 
 namespace PstnBot;
 
-// Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
-public class MeetingCapability
+public abstract class ODataObject
 {
     [JsonPropertyName("@odata.type")]
+    public abstract string odatatype { get; }
+}
+public class MeetingCapability
+{
     public string? odatatype { get; set; }
 }
 
@@ -32,8 +35,6 @@ public class ResourceData
 
 public class ResultInfo
 {
-    [JsonPropertyName("@odata.type")]
-    public string? odatatype { get; set; }
 
     [JsonPropertyName("code")]
     public int code { get; set; }
@@ -72,27 +73,45 @@ public class CommsNotification
     public ResourceData? resourceData { get; set; }
 }
 
-
-public class IdentitySet
+public class PhoneIdentitySet : ODataObject
 {
     [JsonPropertyName("phone")]
     public Identity? Phone { get; set; }
+
+    [JsonPropertyName("@odata.type")]
+    public override string odatatype => "#microsoft.graph.identitySet";
 }
-public class Identity
+
+public class AppInstanceIdentitySet : ODataObject
+{
+    [JsonPropertyName("applicationInstance")]
+    public Identity? ApplicationInstance { get; set; }
+
+    [JsonPropertyName("@odata.type")]
+    public override string odatatype => "#microsoft.graph.identitySet";
+}
+
+
+public class Identity : ODataObject
 {
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
+
+
     [JsonPropertyName("id")]
     public string Id { get; set; } = null!;
+
+    [JsonPropertyName("@odata.type")]
+    public override string odatatype => "#microsoft.graph.identity";
 }
 
-public class ParticipantInfo
+public class ParticipantInfo : ODataObject
 {
     [JsonPropertyName("countryCode")]
     public string? CountryCode { get; set; }
 
     [JsonPropertyName("identity")]
-    public IdentitySet Identity { get; set; }
+    public PhoneIdentitySet Identity { get; set; }
 
     [JsonPropertyName("endpointType")]
     public string? EndpointType { get; set; }
@@ -105,16 +124,12 @@ public class ParticipantInfo
 
     [JsonPropertyName("participantId")]
     public string? ParticipantId { get; set; }
-}
 
-// Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
-public class CallOptions
-{
     [JsonPropertyName("@odata.type")]
-    public string? OdataType { get; set; }
+    public override string odatatype => "#microsoft.graph.invitationParticipantInfo";
 }
 
-public class ChatInfo
+public class CallOptions
 {
     [JsonPropertyName("@odata.type")]
     public string? OdataType { get; set; }
@@ -126,19 +141,14 @@ public class ContentSharingSession
     public string? OdataType { get; set; }
 }
 
-public class MediaConfig
+public class MediaConfig : ODataObject
 {
-    [JsonPropertyName("@odata.type")]
-    public string? OdataType { get; set; }
 
     [JsonPropertyName("PreFetchMedia")]
     public List<Microsoft.Graph.MediaInfo> PreFetchMedia { get; set; } = new();
-}
 
-public class MediaState
-{
     [JsonPropertyName("@odata.type")]
-    public string? OdataType { get; set; }
+    public override string odatatype => "#microsoft.graph.serviceHostedMediaConfig";
 }
 
 public class MeetingInfo
@@ -147,53 +157,23 @@ public class MeetingInfo
     public string? OdataType { get; set; }
 }
 
-public class Call
+public class Call : ODataObject
 {
-    [JsonPropertyName("callbackUri")]
-    public string? CallbackUri { get; set; }
-
-    [JsonPropertyName("callChainId")]
-    public string? CallChainId { get; set; }
-
-    [JsonPropertyName("callOptions")]
-    public CallOptions CallOptions { get; set; }
-
-    [JsonPropertyName("chatInfo")]
-    public ChatInfo ChatInfo { get; set; }
-
-    [JsonPropertyName("contentSharingSessions")]
-    public List<ContentSharingSession> ContentSharingSessions { get; set; }
-
-    [JsonPropertyName("direction")]
-    public string? Direction { get; set; }
 
     [JsonPropertyName("id")]
     public string? Id { get; set; }
 
+    [JsonPropertyName("callbackUri")]
+    public string? CallbackUri { get; set; }
+
     [JsonPropertyName("mediaConfig")]
     public MediaConfig MediaConfig { get; set; }
 
-
-    [JsonPropertyName("myParticipantId")]
-    public string? MyParticipantId { get; set; }
-
-    [JsonPropertyName("replacesContext")]
-    public string? ReplacesContext { get; set; }
-
     [JsonPropertyName("requestedModalities")]
-    public List<string?>? RequestedModalities { get; set; }
-
-    [JsonPropertyName("resultInfo")]
-    public ResultInfo? ResultInfo { get; set; }
+    public List<string> RequestedModalities { get; set; } = new();
 
     [JsonPropertyName("source")]
-    public Source? Source { get; set; }
-
-    [JsonPropertyName("state")]
-    public string? State { get; set; }
-
-    [JsonPropertyName("subject")]
-    public string? Subject { get; set; }
+    public CallSource? Source { get; set; }
 
     [JsonPropertyName("tenantId")]
     public string TenantId { get; set; } = null!;
@@ -201,18 +181,22 @@ public class Call
     [JsonPropertyName("targets")]
     public List<ParticipantInfo>? Targets { get; set; } = new();
 
-    [JsonPropertyName("toneInfo")]
-    public ToneInfo? ToneInfo { get; set; }
+    [JsonPropertyName("@odata.type")]
+    public override string odatatype => "#microsoft.graph.call";
 }
 
-public class Source
+public class CallSource : ODataObject
 {
     [JsonPropertyName("@odata.type")]
-    public string? OdataType { get; set; }
-}
+    public override string odatatype => "#microsoft.graph.participantInfo";
 
-public class ToneInfo
-{
-    [JsonPropertyName("@odata.type")]
-    public string? OdataType { get; set; }
+    [JsonPropertyName("identity")]
+    public AppInstanceIdentitySet Identity { get; set; }
+
+
+
+    public string? countryCode { get; set; }
+    public string? endpointType { get; set; }
+    public string? region { get; set; }
+    public string? languageId { get; set; }
 }
