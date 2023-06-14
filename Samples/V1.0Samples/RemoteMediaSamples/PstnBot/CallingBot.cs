@@ -18,6 +18,9 @@ using ServiceHostedMediaBot.Transport;
 using Newtonsoft.Json;
 using Microsoft.Graph.Communications.Client.Transport;
 using System.Net.Http.Headers;
+using Microsoft.Graph.Communications.Client;
+using Microsoft.Extensions.Options;
+using Microsoft.Graph.Communications.Calls;
 
 namespace Sample.IncidentBot.Bot;
 /// <summary>
@@ -33,45 +36,20 @@ public class CallingBot
     /// </remarks>
     public const string NotificationPromptName = "NotificationPrompt";
 
-    /// <summary>
-    /// The prompt audio name for responder transfering.
-    /// </summary>
-    /// <remarks>
-    /// message: "Your call will be transferred to the incident meeting. Please don't hang off. ".
-    /// </remarks>
-    public const string TransferingPromptName = "TransferingPrompt";
-
-    /// <summary>
-    /// The prompt audio name for bot incoming calls.
-    /// </summary>
-    /// <remarks>
-    /// message: "You are calling an incident application. It's a sample for incoming call with audio prompt.".
-    /// </remarks>
-    public const string BotIncomingPromptName = "BotIncomingPrompt";
-
-    /// <summary>
-    /// The prompt audio name for bot endpoint incoming calls.
-    /// </summary>
-    /// <remarks>
-    /// message: "You are calling an incident application endpoint. It's a sample for incoming call with audio prompt.".
-    /// </remarks>
-    public const string BotEndpointIncomingPromptName = "BotEndpointIncomingPrompt";
     private readonly BotOptions _botOptions;
-    private readonly ILogger _logger;
-    private ConfidentialClientApplicationThrottledHttpClient _httpClient;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="CallingBot" /> class.
     /// </summary>
     /// <param name="options">The bot options.</param>
     /// <param name="graphLogger">The graph logger.</param>
-    public CallingBot(BotOptions botOptions, ILogger logger, IGraphLogger graphLogger)
+    public CallingBot(BotOptions botOptions, IGraphLogger graphLogger)
     {
         _botOptions = botOptions;
-        _logger = logger;
         GraphLogger = graphLogger;
-        _httpClient = new ConfidentialClientApplicationThrottledHttpClient(_botOptions.AppId, _botOptions.AppSecret, _botOptions.TenantId, false, logger);
+        _callbackUri = _botOptions.BotBaseUrl + HttpRouteConstants.OnIncomingRequestRoute;
 
-        var name = this.GetType().Assembly.GetName().Name;
+        var name = this.GetType().Assembly.GetName().Name ?? "CallingBot";
         this.AuthenticationProvider = new AuthenticationProvider(name, _botOptions.AppId, _botOptions.AppSecret, graphLogger);
         this.Serializer = new CommsSerializer();
 
@@ -80,38 +58,11 @@ public class CallingBot
         this.NotificationProcessor.OnNotificationReceived += this.NotificationProcessor_OnNotificationReceived;
         this.RequestBuilder = new Microsoft.Graph.GraphServiceClient("https://graph.microsoft.com/v1.0", authenticationWrapper);
 
-        this.MediaMap[TransferingPromptName] = new Microsoft.Graph.MediaPrompt
-        {
-            MediaInfo = new Microsoft.Graph.MediaInfo
-            {
-                Uri = new Uri(botOptions.BotBaseUrl + "/audio/responder-transfering.wav").ToString(),
-                ResourceId = Guid.NewGuid().ToString(),
-            },
-        };
-
         this.MediaMap[NotificationPromptName] = new Microsoft.Graph.MediaPrompt
         {
             MediaInfo = new Microsoft.Graph.MediaInfo
             {
                 Uri = new Uri(botOptions.BotBaseUrl + "/audio/responder-notification.wav").ToString(),
-                ResourceId = Guid.NewGuid().ToString(),
-            },
-        };
-
-        this.MediaMap[BotIncomingPromptName] = new Microsoft.Graph.MediaPrompt
-        {
-            MediaInfo = new Microsoft.Graph.MediaInfo
-            {
-                Uri = new Uri(botOptions.BotBaseUrl + "/audio/bot-incoming.wav").ToString(),
-                ResourceId = Guid.NewGuid().ToString(),
-            },
-        };
-
-        this.MediaMap[BotEndpointIncomingPromptName] = new Microsoft.Graph.MediaPrompt
-        {
-            MediaInfo = new Microsoft.Graph.MediaInfo
-            {
-                Uri = new Uri(botOptions.BotBaseUrl + "/audio/bot-endpoint-incoming.wav").ToString(),
                 ResourceId = Guid.NewGuid().ToString(),
             },
         };
@@ -123,8 +74,8 @@ public class CallingBot
         }
 
         var productInfo = new ProductInfoHeaderValue(
-            typeof(CallingBot).Assembly.GetName().Name,
-            typeof(CallingBot).Assembly.GetName().Version.ToString());
+            typeof(CallingBot).Assembly.GetName().Name!,
+            typeof(CallingBot).Assembly.GetName().Version?.ToString());
         this.GraphApiClient = new GraphAuthClient(
             this.GraphLogger,
             this.Serializer.JsonSerializerSettings,
@@ -132,8 +83,23 @@ public class CallingBot
             this.AuthenticationProvider,
             productInfo,
             defaultProperties);
+
+        var builder = new CommunicationsClientBuilder(
+                name,
+                botOptions.AppId,
+                graphLogger);
+
+
+        builder.SetAuthenticationProvider(this.AuthenticationProvider);
+        builder.SetNotificationUrl(new Uri(_callbackUri));
+        builder.SetServiceBaseUrl(new Uri(_callbackUri));
+
+        this.Client = builder.Build();
+        this.Client.Calls().OnIncoming += this.CallsOnIncoming;
+        this.Client.Calls().OnUpdated += this.CallsOnUpdated;
     }
     public IGraphLogger GraphLogger { get; set; }
+    public ICommunicationsClient Client { get; }
 
     public IRequestAuthenticationProvider AuthenticationProvider { get; }
 
@@ -149,6 +115,7 @@ public class CallingBot
     /// </summary>
     public Dictionary<string, Microsoft.Graph.MediaPrompt> MediaMap { get; } = new();
 
+    private readonly string _callbackUri;
 
     public GraphServiceClient RequestBuilder { get; }
 
@@ -187,7 +154,7 @@ public class CallingBot
             MediaConfig = new ServiceHostedMediaConfig { PreFetchMedia = mediaToPrefetch },
             RequestedModalities = new List<Modality> { Modality.Audio },
             TenantId = _botOptions.TenantId,
-            CallbackUri = _botOptions.BotBaseUrl + HttpRouteConstants.OnIncomingRequestRoute,
+            CallbackUri = _callbackUri,
             Direction = CallDirection.Outgoing,
             Source = new ParticipantInfo
             {
