@@ -21,6 +21,8 @@ using System.Net.Http.Headers;
 using Microsoft.Graph.Communications.Client;
 using Microsoft.Extensions.Options;
 using Microsoft.Graph.Communications.Calls;
+using Microsoft.Graph.Communications.Resources;
+using System.Collections.Concurrent;
 
 namespace Sample.IncidentBot.Bot;
 /// <summary>
@@ -95,7 +97,6 @@ public class CallingBot
         builder.SetServiceBaseUrl(new Uri(_callbackUri));
 
         this.Client = builder.Build();
-        this.Client.Calls().OnIncoming += this.CallsOnIncoming;
         this.Client.Calls().OnUpdated += this.CallsOnUpdated;
     }
     public IGraphLogger GraphLogger { get; set; }
@@ -115,9 +116,28 @@ public class CallingBot
     /// </summary>
     public Dictionary<string, Microsoft.Graph.MediaPrompt> MediaMap { get; } = new();
 
+    public ConcurrentDictionary<string, CallHandler> CallHandlers { get; } = new ConcurrentDictionary<string, CallHandler>();
     private readonly string _callbackUri;
 
     public GraphServiceClient RequestBuilder { get; }
+
+
+
+    /// <summary>
+    /// Updated call handler.
+    /// </summary>
+    /// <param name="sender">The <see cref="ICallCollection"/> sender.</param>
+    /// <param name="args">The <see cref="CollectionEventArgs{ICall}"/> instance containing the event data.</param>
+    private void CallsOnUpdated(ICallCollection sender, CollectionEventArgs<ICall> args)
+    {
+        foreach (var call in args.RemovedResources)
+        {
+            if (this.CallHandlers.TryRemove(call.Id, out CallHandler handler))
+            {
+                handler.Dispose();
+            }
+        }
+    }
 
     /// <summary>
     /// Raise an incident.
@@ -183,122 +203,6 @@ public class CallingBot
         var r = await this.GraphApiClient.SendAsync<Call, Call>(request, newCall.TenantId, scenarioId).ConfigureAwait(false);
 
         return r.Content;
-    }
-
-
-    public async Task ProcessNotificationAsync(
-        HttpRequest request,
-        HttpResponse response)
-    {
-        var headers = request.Headers.Select(
-            pair => new KeyValuePair<string, IEnumerable<string>>(pair.Key, pair.Value));
-
-        var stopwatch = new Stopwatch();
-        stopwatch.Start();
-        this.GraphLogger.LogHttpMessage(
-            TraceLevel.Verbose,
-            TransactionDirection.Incoming,
-            HttpTraceType.HttpRequest,
-            request.GetDisplayUrl(),
-            request.Method,
-            obfuscatedContent: null,
-            headers: headers);
-
-        try
-        {
-            var httpRequest = request.CreateRequestMessage();
-            var results = await this.AuthenticationProvider.ValidateInboundRequestAsync(httpRequest).ConfigureAwait(false);
-            if (results.IsValid)
-            {
-                var httpResponse = await this.NotificationProcessor.ProcessNotificationAsync(httpRequest).ConfigureAwait(false);
-                await httpResponse.CreateHttpResponseAsync(response).ConfigureAwait(false);
-            }
-            else
-            {
-                // This way is not working. Demands further investigation
-                //var httpResponse = httpRequest.CreateResponse(HttpStatusCode.Forbidden);
-                var httpResponse = new HttpResponseMessage(HttpStatusCode.Forbidden);
-                await httpResponse.CreateHttpResponseAsync(response).ConfigureAwait(false);
-            }
-
-            headers = response.Headers.Select(
-                pair => new KeyValuePair<string, IEnumerable<string>>(pair.Key, pair.Value));
-
-            this.GraphLogger.LogHttpMessage(
-                TraceLevel.Verbose,
-                TransactionDirection.Incoming,
-                HttpTraceType.HttpResponse,
-                request.GetDisplayUrl(),
-                request.Method,
-                obfuscatedContent: null,
-                headers: headers,
-                responseCode: response.StatusCode,
-                responseTime: stopwatch.ElapsedMilliseconds);
-        }
-        catch (Microsoft.Graph.ServiceException e)
-        {
-            string obfuscatedContent = null;
-            if ((int)e.StatusCode >= 300)
-            {
-                response.StatusCode = (int)e.StatusCode;
-                await response.WriteAsync(e.ToString()).ConfigureAwait(false);
-                obfuscatedContent = this.GraphLogger.SerializeAndObfuscate(e, Formatting.Indented);
-            }
-            else if ((int)e.StatusCode >= 200)
-            {
-                response.StatusCode = (int)e.StatusCode;
-            }
-            else
-            {
-                response.StatusCode = (int)e.StatusCode;
-                await response.WriteAsync(e.ToString()).ConfigureAwait(false);
-                obfuscatedContent = this.GraphLogger.SerializeAndObfuscate(e, Formatting.Indented);
-            }
-
-            headers = response.Headers.Select(
-                pair => new KeyValuePair<string, IEnumerable<string>>(pair.Key, pair.Value));
-
-            if (e.ResponseHeaders?.Any() == true)
-            {
-                foreach (var pair in e.ResponseHeaders)
-                {
-                    response.Headers.Add(pair.Key, new StringValues(pair.Value.ToArray()));
-                }
-
-                headers = headers.Concat(e.ResponseHeaders);
-            }
-
-            this.GraphLogger.LogHttpMessage(
-                TraceLevel.Error,
-                TransactionDirection.Incoming,
-                HttpTraceType.HttpResponse,
-                request.GetDisplayUrl(),
-                request.Method,
-                obfuscatedContent,
-                headers,
-                response.StatusCode,
-                responseTime: stopwatch.ElapsedMilliseconds);
-        }
-        catch (Exception e)
-        {
-            response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await response.WriteAsync(e.ToString()).ConfigureAwait(false);
-
-            var obfuscatedContent = this.GraphLogger.SerializeAndObfuscate(e, Formatting.Indented);
-            headers = response.Headers.Select(
-                pair => new KeyValuePair<string, IEnumerable<string>>(pair.Key, pair.Value));
-
-            this.GraphLogger.LogHttpMessage(
-               TraceLevel.Error,
-               TransactionDirection.Incoming,
-               HttpTraceType.HttpResponse,
-               request.GetDisplayUrl(),
-               request.Method,
-               obfuscatedContent,
-               headers,
-               response.StatusCode,
-               responseTime: stopwatch.ElapsedMilliseconds);
-        }
     }
 
     private void NotificationProcessor_OnNotificationReceived(NotificationEventArgs args)
