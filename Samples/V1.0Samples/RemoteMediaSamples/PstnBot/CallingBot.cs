@@ -1,25 +1,15 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Text.Json;
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.Extensions.Primitives;
+﻿using System.Text.Json;
 using Microsoft.Graph.Communications.Client.Authentication;
 using Microsoft.Graph.Communications.Common.Telemetry;
 using Microsoft.Graph.Communications.Common.Transport;
-using Microsoft.Graph.Communications.Core.Notifications;
 using Microsoft.Graph.Communications.Core.Serialization;
 using PstnBot;
-using ServiceHostedMediaBot.Extensions;
 using ServiceHostedMediaBot.Authentication;
-using Microsoft.Graph.Communications.Common;
-using ServiceHostedMediaBot.Common;
 using Microsoft.Graph;
 using ServiceHostedMediaBot.Transport;
-using Newtonsoft.Json;
 using Microsoft.Graph.Communications.Client.Transport;
 using System.Net.Http.Headers;
 using Microsoft.Graph.Communications.Client;
-using Microsoft.Extensions.Options;
 using Microsoft.Graph.Communications.Calls;
 using Microsoft.Graph.Communications.Resources;
 using System.Collections.Concurrent;
@@ -56,8 +46,6 @@ public class CallingBot
         this.Serializer = new CommsSerializer();
 
         var authenticationWrapper = new AuthenticationWrapper(this.AuthenticationProvider);
-        this.NotificationProcessor = new NotificationProcessor(authenticationWrapper, this.Serializer);
-        this.NotificationProcessor.OnNotificationReceived += this.NotificationProcessor_OnNotificationReceived;
         this.RequestBuilder = new Microsoft.Graph.GraphServiceClient("https://graph.microsoft.com/v1.0", authenticationWrapper);
 
         this.MediaMap[NotificationPromptName] = new Microsoft.Graph.MediaPrompt
@@ -103,9 +91,6 @@ public class CallingBot
     public ICommunicationsClient Client { get; }
 
     public IRequestAuthenticationProvider AuthenticationProvider { get; }
-
-    public INotificationProcessor NotificationProcessor { get; }
-
 
     public CommsSerializer Serializer { get; }
 
@@ -205,84 +190,4 @@ public class CallingBot
         return r.Content;
     }
 
-    private void NotificationProcessor_OnNotificationReceived(NotificationEventArgs args)
-    {
-        this.NotificationProcessor_OnNotificationReceivedAsync(args).ForgetAndLogExceptionAsync(
-            this.GraphLogger,
-            $"Error processing notification {args.Notification.ResourceUrl} with scenario {args.ScenarioId}");
-    }
-
-    private async Task NotificationProcessor_OnNotificationReceivedAsync(NotificationEventArgs args)
-    {
-        this.GraphLogger.CorrelationId = args.ScenarioId;
-        var headers = new[]
-        {
-                new KeyValuePair<string, IEnumerable<string>>(HttpConstants.HeaderNames.ScenarioId, new[] {args.ScenarioId.ToString() }),
-                new KeyValuePair<string, IEnumerable<string>>(HttpConstants.HeaderNames.ClientRequestId, new[] {args.RequestId.ToString() }),
-                new KeyValuePair<string, IEnumerable<string>>(HttpConstants.HeaderNames.Tenant, new[] {args.TenantId }),
-            };
-
-        var notifications = new CommsNotifications { Value = new[] { args.Notification } };
-        var obfuscatedContent = this.GraphLogger.SerializeAndObfuscate(notifications, Formatting.Indented);
-        this.GraphLogger.LogHttpMessage(
-            TraceLevel.Info,
-            TransactionDirection.Incoming,
-            HttpTraceType.HttpRequest,
-            args.CallbackUri.ToString(),
-            Microsoft.AspNetCore.Http.HttpMethods.Post,
-            obfuscatedContent,
-            headers,
-            correlationId: args.ScenarioId,
-            requestId: args.RequestId);
-
-        if (args.ResourceData is Call call)
-        {
-            if (call.State == CallState.Established && call.MediaState?.Audio == MediaState.Active)
-            {
-                await this.BotRecordsOutgoingCallAsync(call.Id, args.TenantId, args.ScenarioId).ConfigureAwait(false);
-            }
-            else if (args.ChangeType == ChangeType.Deleted && call.State == CallState.Terminated)
-            {
-                this.GraphLogger.Log(TraceLevel.Info, $"Call State:{call.State}");
-            }
-        }
-        else if (args.ResourceData is PlayPromptOperation playPromptOperation)
-        {
-            if (string.IsNullOrWhiteSpace(playPromptOperation.ClientContext))
-            {
-                throw new ServiceException(new Error()
-                {
-                    Message = "No call id proided in PlayPromptOperation.ClientContext.",
-                });
-            }
-            else if (playPromptOperation.Status == OperationStatus.Completed)
-            {
-                await this.BotHangupCallAsync(playPromptOperation.ClientContext, args.TenantId, args.ScenarioId).ConfigureAwait(false);
-                this.GraphLogger.Log(TraceLevel.Info, $"Disconnecting the call.");
-            }
-        }
-    }
-
-    private async Task BotHangupCallAsync(string callId, string tenantId, Guid scenarioId)
-    {
-        var hangupRequest = this.RequestBuilder.Communications.Calls[callId].Request();
-        await this.GraphApiClient.SendAsync(hangupRequest, RequestType.Delete, tenantId, scenarioId).ConfigureAwait(false);
-    }
-
-    private async Task BotRecordsOutgoingCallAsync(string callId, string tenantId, Guid scenarioId)
-    {
-
-        IEnumerable<string> stopTones = new List<string>() { "#" };
-        var recordRequest = this.RequestBuilder.Communications.Calls[callId].RecordResponse(
-            bargeInAllowed: true,
-            clientContext: callId,
-            //prompts: prompts,
-            maxRecordDurationInSeconds: 20,
-            initialSilenceTimeoutInSeconds: 2,
-            maxSilenceTimeoutInSeconds: 2,
-            playBeep: true,
-            stopTones: stopTones).Request();
-
-        await this.GraphApiClient.SendAsync(recordRequest, RequestType.Create, tenantId, scenarioId).ConfigureAwait(false);
-    }
 }
